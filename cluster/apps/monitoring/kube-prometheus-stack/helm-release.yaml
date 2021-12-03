@@ -1,0 +1,210 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      # renovate: registryUrl=https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      interval: 5m
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community-charts
+        namespace: flux-system
+      version: "20.0.1"
+  interval: 5m
+  values:
+    alertmanager:
+      alertmanagerSpec:
+        storage:
+          volumeClaimTemplate:
+            spec:
+              resources:
+                requests:
+                  storage: 1Gi
+              storageClassName: ceph-block
+      config:
+        global:
+          resolve_timeout: 5m
+          slack_api_url: "${SECRET_ALERT_MANAGER_DISCORD_WEBHOOK}"
+        inhibit_rules:
+          -
+            equal:
+              - alertname
+              - namespace
+            source_match:
+              severity: critical
+            target_match:
+              severity: warning
+        receivers:
+          -
+            name: "null"
+          -
+            name: discord
+            slack_configs:
+              -
+                channel: "#prometheus"
+                icon_url: "https://avatars3.githubusercontent.com/u/3380462"
+                send_resolved: true
+                text: |-
+                    {{ range .Alerts -}}
+                      **Alert:** {{ .Annotations.title }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+
+                    **Description:** {{ if ne .Annotations.description ""}}{{ .Annotations.description }}{{else}}N/A{{ end }}
+                    **Details:**
+                      {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+                      {{ end }}
+                    {{ end }}
+                title: "[{{ .Status | toUpper }}{{ if eq .Status \"firing\" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ if ne .CommonAnnotations.summary \"\"}}{{ .CommonAnnotations.summary }}{{ else }}{{ .CommonLabels.alertname }}{{ end }}"
+                username: Prometheus
+          -
+            name: nodered
+            webhook_configs:
+              -
+                send_resolved: true
+                url: "http://node-red.home:1880/power-outage"
+        route:
+          group_by:
+            - alertname
+            - job
+          group_interval: 5m
+          group_wait: 30s
+          receiver: discord
+          repeat_interval: 6h
+          routes:
+            -
+              match:
+                alertname: Watchdog
+              receiver: "null"
+            -
+              continue: true
+              match_re:
+                severity: critical
+              receiver: discord
+            -
+              continue: true
+              match:
+                alertname: UPSOnBattery
+              receiver: nodered
+      ingress:
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-production
+          traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        enabled: true
+        hosts:
+          - "alert-manager.${SECRET_DOMAIN}"
+        ingressClassName: traefik
+        pathType: Prefix
+        tls:
+          -
+            hosts:
+              - "alert-manager.${SECRET_DOMAIN}"
+    fullnameOverride: prometheus
+    grafana:
+      enabled: false
+      forceDeployDashboards: true
+      sidecar:
+        dashboards:
+          multicluster:
+            etcd:
+              enabled: true
+    kube-state-metrics:
+      fullnameOverride: kube-state-metrics
+    kubeApiServer:
+      enabled: true
+    kubeControllerManager:
+      enabled: true
+      endpoints:
+        - "192.168.0.55"
+    kubeEtcd:
+      enabled: true
+      endpoints:
+        - "192.168.0.55"
+      service:
+        enabled: true
+        port: 2381
+        targetPort: 2381
+    kubeProxy:
+      enabled: true
+      endpoints:
+        - "192.168.0.55"
+    kubeScheduler:
+      enabled: true
+      endpoints:
+        - "192.168.0.55"
+    kubelet:
+      enabled: true
+      serviceMonitor:
+        metricRelabelings:
+          -
+            action: replace
+            sourceLabels:
+              - node
+            targetLabel: instance
+    nodeExporter:
+      serviceMonitor:
+        relabelings:
+          -
+            action: replace
+            regex: (.*)
+            replacement: $1
+            sourceLabels:
+              - __meta_kubernetes_pod_node_name
+            targetLabel: kubernetes_node
+    prometheus:
+      ingress:
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-production
+          traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        enabled: true
+        hosts:
+          - "prometheus.${SECRET_DOMAIN}"
+        ingressClassName: traefik
+        pathType: Prefix
+        tls:
+          -
+            hosts:
+              - "prometheus.${SECRET_DOMAIN}"
+      prometheusSpec:
+        additionalScrapeConfigs:
+          -
+            honor_timestamps: true
+            job_name: minio-job
+            metrics_path: /minio/v2/metrics/cluster
+            static_configs:
+              -
+                targets:
+                  - "minio.tools:9000"
+        enableAdminAPI: true
+        podMonitorSelectorNilUsesHelmValues: false
+        probeSelectorNilUsesHelmValues: false
+        replicaExternalLabelName: replica
+        replicas: 1
+        retention: 6h
+        ruleSelectorNilUsesHelmValues: false
+        serviceMonitorSelectorNilUsesHelmValues: false
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              resources:
+                requests:
+                  storage: 10Gi
+              storageClassName: ceph-block
+        thanos:
+          image: "raspbernetes/thanos:v0.23.1"
+          objectStorageConfig:
+            key: objstore.yml
+            name: thanos-objstore
+          version: v0.23.1
+        walCompression: true
+      thanosService:
+        enabled: true
+      thanosServiceMonitor:
+        enabled: true
+    prometheus-node-exporter:
+      fullnameOverride: node-exporter
+    prometheusOperator:
+      configReloaderCpu: 0

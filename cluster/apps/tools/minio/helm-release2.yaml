@@ -1,0 +1,48 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  namespace: tools
+  name: minio
+spec:
+  chart:
+    spec:
+      sourceRef:
+        kind: HelmRepository
+        namespace: flux-system
+        name: minio
+      # renovate: registryUrl=https://helm.min.io/
+      chart: minio
+      version: 8.0.10
+  interval: 1h
+  values:
+    persistence:
+      storageClass: nfs-client
+      size: 500Gi
+    ingress:
+      main:
+        enabled: true
+        ingressClassName: "traefik"
+        annotations:
+          # TODO: Add hajimari annotations to minio ingress
+          cert-manager.io/cluster-issuer: "letsencrypt-production"
+          traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+        hosts:
+          - host: "minio.${SECRET_DOMAIN}"
+        tls:
+          - hosts:
+              - "minio.${SECRET_DOMAIN}"
+            secretName: minio-tls
+    resources:
+      requests:
+        memory: 1Gi
+
+    mode: standalone
+    existingSecret: minio
+    buckets:
+      - name: thanos
+        policy: none
+        purge: false
+      - name: velero
+        policy: none
+        purge: false
