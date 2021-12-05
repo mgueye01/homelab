@@ -125,6 +125,9 @@ spec:
         blocky:
           url: https://raw.githubusercontent.com/0xERR0R/blocky/v0.16/docs/blocky-grafana.json
           datasource: Prometheus
+        k8s-dashboard:
+          url: https://raw.githubusercontent.com/mgueye01/homelab/main/cluster/apps/monitoring/grafana/dashboards/k8s-for-prometheus-dashboard.json
+          datasource: Prometheus
     sidecar:
       dashboards:
         enabled: true
