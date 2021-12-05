@@ -40,19 +40,26 @@ spec:
               - "rook.${SECRET_DOMAIN}"
             secretName: "rook-dashboard-tls"
       storage:
-        useAllNodes: true
-        useAllDevices: true
+        useAllNodes: false
+        useAllDevices: false
         config:
           osdsPerDevice: "1"
         nodes:
           - name: "k8s-3"
             devices:
               - name: "sdb"
+              - name: "sda"
           - name: "k8s-2"
             devices:
               - name: "sdb"
+              - name: "sda"
           - name: "k8s-1"
             devices:
               - name: "sdb"
+              - name: "sda"
+          - name: "k8s-0"
+            devices:
+              - name: "sdb"
+              - name: "sda"
     cephFileSystems: []
     cephObjectStores: []
