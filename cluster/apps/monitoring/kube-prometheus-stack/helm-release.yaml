@@ -119,10 +119,14 @@ spec:
       enabled: true
       endpoints:
         - "192.168.0.55"
+        - "192.168.0.54"
+        - "192.168.0.53"
     kubeEtcd:
       enabled: true
       endpoints:
         - "192.168.0.55"
+        - "192.168.0.54"
+        - "192.168.0.53"
       service:
         enabled: true
         port: 2381
@@ -131,10 +135,14 @@ spec:
       enabled: true
       endpoints:
         - "192.168.0.55"
+        - "192.168.0.54"
+        - "192.168.0.53"
     kubeScheduler:
       enabled: true
       endpoints:
         - "192.168.0.55"
+        - "192.168.0.54"
+        - "192.168.0.53"
     kubelet:
       enabled: true
       serviceMonitor:
